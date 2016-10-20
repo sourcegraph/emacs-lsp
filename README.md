@@ -1,2 +1,2 @@
 # emacs-lsp
-LSP compatibility for Emacs
+LSP support for Emacs
