@@ -100,3 +100,65 @@
 
 (defun lsp-did-change-watched-files (file-events)
   (lsp-ntfn "workspace/didChangeWatchedFiles" `((changes . ,file-events))))
+
+(defun lsp-completion (id pos-params)
+  (lsp-request id "textDocument/completion" pos-params))
+
+(defun lsp-resolve-completion (id completion-item)
+  (lsp-request id "completionItem/resolve" completion-item))
+
+(defun lsp-hover (id pos-params)
+  (lsp-request id "textDocument/hover" pos-params))
+
+(defun lsp-signature-help (id pos-params)
+  (lsp-request id "textDocument/signatureHelp" pos-params))
+
+(defun lsp-goto-def (id pos-params)
+  (lsp-request id "textDocument/definition" pos-params))
+
+(defun lsp-ref-context (include-decl)
+  `((includeDeclaration . ,include-decl)))
+
+(defun lsp-ref-params (pos-params context)
+  (cons `(context . ,context) context))
+
+(defun lsp-find-refs (id ref-params)
+  (lsp-request id "textDocument/references" ref-params))
+
+(defun lsp-highlights (id pos-params)
+  (lsp-request id "textDocument/documentHighlight" pos-params))
+
+(defun lsp-symbol-params (doc-id)
+  `((textDocument . ,doc-id)))
+
+(defvar lsp-symbol-kinds
+  '(
+    (file . 1) (module . 2) (namespace . 3) (package . 4) (class . 5) (method . 6)
+    (property . 7) (field . 8) (constructor . 9) (enum . 10) (interface . 11)
+    (function . 12) (variable . 13) (constant . 14) (string . 15) (number . 16)
+    (boolean . 17) (array . 18)
+    ))
+
+(defun lsp-symbols (id symbol-params)
+  (lsp-request id "textDocument/documentSymbol" symbol-params))
+
+(defun lsp-workspace-symbol-params (query)
+  `((query . ,query)))
+
+(defun lsp-workspace-symbols (id symbol-params)
+  (lsp-request id "workspace/symbol" symbol-params))
+
+(defun lsp-code-action-context (diagnostics)
+  `((diagnostics . ,diagnostics)))
+
+(defun lsp-code-action-params (doc-id range action-context)
+  `((textDocument . ,doc-id) (range . ,range) (context . ,action-context)))
+
+(defun lsp-code-action (id action-params)
+  (lsp-request id "textDocument/codeAction" action-params))
+
+(defun lsp-code-lens-params (doc-id)
+  `((textDocument . ,doc-id)))
+
+(defun lsp-code-lens (id code-lens-params)
+  (lsp-request id "textDocument/codeLens" code-lens-params))
