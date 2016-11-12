@@ -7,14 +7,17 @@
 (defun lsp-wrap-payload (body &optional content-type)
   "Add Content-Type and Content-Length headers to an LSP payload"
   (let ((len (length body))
-        (type (if (null content-type) "Content-Type: application/vscode-jsonrpc; charset=utf-8")))
-    (apply #'concat (mapcar (lambda (s) (encode-coding-string s 'utf-8))
+        (type (if (null content-type) "application/vscode-jsonrpc; charset=utf-8" type)))
+    (apply 'concat (mapcar (lambda (s) (encode-coding-string s 'utf-8))
                             `("Content-Length: " ,(number-to-string len) "\r\n" "Content-Type: " ,type "\r\n\r\n" ,body)))
     )
   )
 
-(defun lsp-request (id method &optional params)
-  `((id . ,id) (method . ,method) (params . ,params))
+(defun lsp-message (msg)
+  (lsp-wrap-payload (json-encode msg)))
+
+(defun lsp-request (method &optional params)
+  `((method . ,method) (params . ,params))
   )
 
 (defun lsp-ntfn (method &optional params)
@@ -62,11 +65,14 @@
 (defun lsp-text-doc-pos-params (doc-id pos)
   `((textDocument . ,doc-id) (position . ,pos)))
 
+(defun lsp-init (init-params)
+  (lsp-request "initialize" init-params))
+
 (defun lsp-init-params (caps &optional ppid root-path init-options)
   `((capabilities . ,caps) (processId . ,ppid) (rootPath . ,root-path) (initializationOptions . ,init-options)))
 
-(defun lsp-shutdown (id)
-  (lsp-request id "shutdown"))
+(defun lsp-shutdown ()
+  (lsp-request "shutdown"))
 
 (defun lsp-exit ()
   (lsp-ntfn "exit"))
@@ -89,7 +95,7 @@
 (defun lsp-did-close-text-doc (doc-id)
   (lsp-ntfn "textDocument/didClose" `((textDocument . ,doc-id))))
 
-(defun lsp-save-text-doc (doc-id)
+(defun lsp-did-save-text-doc (doc-id)
   (lsp-ntfn "textDocument/didSave" `((textDocument . ,doc-id))))
 
 (defvar lsp-file-change-type
@@ -101,32 +107,32 @@
 (defun lsp-did-change-watched-files (file-events)
   (lsp-ntfn "workspace/didChangeWatchedFiles" `((changes . ,file-events))))
 
-(defun lsp-completion (id pos-params)
-  (lsp-request id "textDocument/completion" pos-params))
+(defun lsp-completion (pos-params)
+  (lsp-request "textDocument/completion" pos-params))
 
-(defun lsp-resolve-completion (id completion-item)
-  (lsp-request id "completionItem/resolve" completion-item))
+(defun lsp-resolve-completion (completion-item)
+  (lsp-request "completionItem/resolve" completion-item))
 
-(defun lsp-hover (id pos-params)
-  (lsp-request id "textDocument/hover" pos-params))
+(defun lsp-hover (pos-params)
+  (lsp-request "textDocument/hover" pos-params))
 
-(defun lsp-signature-help (id pos-params)
-  (lsp-request id "textDocument/signatureHelp" pos-params))
+(defun lsp-signature-help (pos-params)
+  (lsp-request "textDocument/signatureHelp" pos-params))
 
-(defun lsp-goto-def (id pos-params)
-  (lsp-request id "textDocument/definition" pos-params))
+(defun lsp-goto-def (pos-params)
+  (lsp-request "textDocument/definition" pos-params))
 
 (defun lsp-ref-context (include-decl)
   `((includeDeclaration . ,include-decl)))
 
 (defun lsp-ref-params (pos-params context)
-  (cons `(context . ,context) context))
+  (cons `(context . ,context) pos-params))
 
-(defun lsp-find-refs (id ref-params)
-  (lsp-request id "textDocument/references" ref-params))
+(defun lsp-find-refs (ref-params)
+  (lsp-request "textDocument/references" ref-params))
 
-(defun lsp-highlights (id pos-params)
-  (lsp-request id "textDocument/documentHighlight" pos-params))
+(defun lsp-highlights (pos-params)
+  (lsp-request "textDocument/documentHighlight" pos-params))
 
 (defun lsp-symbol-params (doc-id)
   `((textDocument . ,doc-id)))
@@ -139,14 +145,14 @@
     (boolean . 17) (array . 18)
     ))
 
-(defun lsp-symbols (id symbol-params)
-  (lsp-request id "textDocument/documentSymbol" symbol-params))
+(defun lsp-symbols (symbol-params)
+  (lsp-request "textDocument/documentSymbol" symbol-params))
 
 (defun lsp-workspace-symbol-params (query)
   `((query . ,query)))
 
-(defun lsp-workspace-symbols (id symbol-params)
-  (lsp-request id "workspace/symbol" symbol-params))
+(defun lsp-workspace-symbols (symbol-params)
+  (lsp-request "workspace/symbol" symbol-params))
 
 (defun lsp-code-action-context (diagnostics)
   `((diagnostics . ,diagnostics)))
@@ -154,11 +160,13 @@
 (defun lsp-code-action-params (doc-id range action-context)
   `((textDocument . ,doc-id) (range . ,range) (context . ,action-context)))
 
-(defun lsp-code-action (id action-params)
-  (lsp-request id "textDocument/codeAction" action-params))
+(defun lsp-code-action (action-params)
+  (lsp-request "textDocument/codeAction" action-params))
 
 (defun lsp-code-lens-params (doc-id)
   `((textDocument . ,doc-id)))
 
-(defun lsp-code-lens (id code-lens-params)
-  (lsp-request id "textDocument/codeLens" code-lens-params))
+(defun lsp-code-lens (code-lens-params)
+  (lsp-request "textDocument/codeLens" code-lens-params))
+
+(provide 'lsp)
