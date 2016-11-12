@@ -26,11 +26,7 @@
 ;;; registered, it will be called with the object.
 
 (defun lsp-ignore (res body)
-  (y-or-n-p body)
-  (let ((buf (get-buffer-create "*LSP-Error*")))
-    (with-current-buffer buf
-      (insert body)
-      (insert "\n"))))
+  (message "Ignored LSP error: %S" body))
 
 (defun lsp-filter (session)
   (lambda (proc string)
@@ -43,39 +39,43 @@
             (insert string)
             (set-marker (process-mark proc) (point)))
           (if moving (goto-char (process-mark proc))))
-        (ignore-errors
-          ;; FIXME: Expected error: invalid json should dump that portion of the
-          ;; buffer, instead of ignoring. Right now, invalid json will cause
-          ;; *whole* buffer to be dumped
+        ;; FIXME: Expected error: invalid json should dump that portion of the
+        ;; buffer, instead of ignoring. Right now, invalid json will cause
+        ;; all future messages to be ignored, as it will die trying to parse
+        ;; the firstmost message.
 
-          ;; Expected error: args-out-of-range from buffer-substring should
-          ;; break from the loop, to be tried again the next time the filter
-          ;; function is called, once there is more data.
-          (while (string-equal "Content-Length: " (buffer-substring (point-min) 17))
-            (save-excursion
-              ;; extract the content-length
-              ;; TODO: replace with principled header parsing into alist
-              (goto-char 17)
-              (looking-at "[0-9]+")
-              (let ((content-length (string-to-int (match-string 0)))
-                    (conn (gethash ws-cache lsp-ws-connection-map)))
-                ;; scan point forward to start of body
-                (search-forward "\r\n{")
-                (let* ((content-body (buffer-substring (- (point) 1) content-length))
-                       (content (json-read-from-string content-body))
-                       (sess (ls-connection-session conn))
-                       (id (alist-get 'id content))
-                       (cb (gethash id sess)))
-                  ;; remove the request from the buffer
-                  (delete-region (point-min) (+ (- (point) 1) content-length))
-                  ;; handle the request body
-                  (if (null cb)
-                      (puthash id content sess)
-                    (progn
-                      (if (null (alist-get 'result content))
-                          (apply cb (list :error (alist-get 'error content)))
-                        (apply cb (list :success (alist-get 'result content))))
-                      (remhash id sess))))))))))))
+        ;; Expected error: args-out-of-range from buffer-substring should
+        ;; break from the loop, to be tried again the next time the filter
+        ;; function is called, once there is more data.
+
+        (condition-case error
+            (while (string-equal "Content-Length: " (buffer-substring (point-min) 17))
+              (save-excursion
+                ;; extract the content-length
+                ;; TODO: replace with principled header parsing into alist
+                (goto-char 17)
+                (looking-at "[0-9]+")
+                (let ((content-length (string-to-int (match-string 0)))
+                      (conn (gethash ws-cache lsp-ws-connection-map)))
+                  ;; scan point forward to start of body
+                  (search-forward "\r\n{")
+                  (let* ((content-body (buffer-substring (- (point) 1) (+ (- (point) 1) content-length)))
+                         (content (let ((json-array-type 'list)) (json-read-from-string content-body)))
+                         (sess (ls-connection-session conn))
+                         (id (alist-get 'id content))
+                         (cb (gethash id sess)))
+                    ;; remove the request from the buffer
+                    (delete-region (point-min) (+ (- (point) 1) content-length))
+                    ;; handle the request body
+                    (if (null cb)
+                        (puthash id content sess)
+                      (progn
+                        (if (null (alist-get 'result content))
+                            (apply cb (list :error (alist-get 'error content)))
+                          (apply cb (list :success (alist-get 'result content))))
+                        (remhash id sess)))))))
+          (args-out-of-range t)
+          )))))
 
 
 ;;; FIXME: this should probably use a while loop of some sort, instead of the
@@ -83,15 +83,15 @@
 ;;; to the callback nature.
 
 (defun init-lsp-conn-inner (ws conn)
-    (send-lsp-msg (lsp-init (lsp-init-params nil nil ws nil))
-                      (lambda (res body)
-                        (cond ((equal res :error)
-                               (let* ((err (alist-get 'error body))
-                                      (retry (alist-get 'retry err)))
-                                 (lsp-display-err-and-wait-for-confirmation body)
-                                 (init-lsp-conn-inner ws conn)))
-                              ((equal res :success)
-                               (setq (ls-connection-server-caps conn) (alist-get 'capabilities body)))))))
+  (send-lsp-msg (lsp-init (lsp-init-params nil nil ws nil))
+                (lambda (res body)
+                  (cond ((equal res :error)
+                         (let* ((err (alist-get 'error body))
+                                (retry (alist-get 'retry err)))
+                           (lsp-display-err-and-wait-for-confirmation body)
+                           (init-lsp-conn-inner ws conn)))
+                        ((equal res :success)
+                         (setf (ls-connection-server-caps conn) (alist-get 'capabilities body)))))))
 
 (defun lsp-mode-init-conn (host port)
   "Initialize a new connection to an LSP"
@@ -119,7 +119,6 @@
   )
 
 (defun uri-for-path (p)
-  (message p)
   (apply 'concat (list "file://" p)) ; FIXME: more robust? does this work on windows?
   )
 
@@ -136,14 +135,6 @@
 (defun current-lsp-text-doc-pos ()
   (lsp-text-doc-pos-params (lsp-text-doc-id (uri-for-path (buffer-file-name))) (current-lsp-pos)))
 
-(defun lsp-mode-goto-cb (res body)
-  (cond (((equal res :error)
-          (lsp-ignore res body))
-         ((equal res :success)
-          (if (listp body)
-              (lsp-mode-select-destination body)
-            (lsp-mode-goto-loc body))))))
-
 (defun alist-navigate (obj &rest path)
   "Extract a property from an alist, using successive symbols from path."
   (let ((cur_obj obj))
@@ -153,9 +144,10 @@
 (defun lsp-mode-goto-loc (loc)
   (let ((comps (split-string (alist-get 'uri loc) "://")))
     (if (equal (car comps) "file")
-        (let ((newbuf (find-file-noselect (substring (alist-get 'uri loc) 8))))
-          (switch-to-buffer newbuf)
+        (let ((newbuf (find-file-noselect (substring (alist-get 'uri loc) 7))))
+          (switch-to-buffer-other-window newbuf)
           (lsp-mode)
+          (beginning-of-buffer)
           (forward-line (alist-navigate loc 'range 'start 'line))
           (forward-char (alist-navigate loc 'range 'start 'character)))
       )))
@@ -164,17 +156,20 @@
   "Given a list of locations, display them in a new window with hyperlinks"
   (let ((buf (get-buffer-create "*LSP-Select-Destination*")))
     (with-current-buffer buf
+      (erase-buffer)
       (dolist (loc locs)
         (insert-button
-         (apply 'concat (list (alist-get 'uri loc) " at line " (int-to-string (alist-navigate loc 'range 'start 'line))))
-         :location loc
-         :action (lambda (b) (lsp-mode-goto-loc (button-get b :location))))))
+         (apply 'concat (list (alist-get 'uri loc) " at line " (int-to-string (alist-navigate loc 'range 'start 'line)) "\n"))
+         'location loc
+         'follow-link t
+         'action (lambda (b) (lsp-mode-goto-loc (button-get b 'location))))))
     (switch-to-buffer-other-window buf)))
 
 (defun lsp-mode-list-symbols (syms)
   "Given a list of symbols, display them in a new window with hyperlinks"
   (let ((buf (get-buffer-create "*LSP-List-Symbols*")))
     (with-current-buffer buf
+      (erase-buffer)
       (dolist (sym syms)
         (insert-button
          (apply 'concat (list
@@ -184,11 +179,21 @@
                          " in "
                          (alist-navigate sym 'location 'uri)
                          " at line "
-                         (int-to-string (alist-navigate sym 'location 'range 'start 'line))))
-         :symbol sym
-         :action (lambda (b) (lsp-mode-goto-loc (alist-get 'location (button-get b :symbol))))
+                         (int-to-string (alist-navigate sym 'location 'range 'start 'line))
+                         "\n"))
+         'symbol sym
+         'follow-link t
+         'action (lambda (b) (lsp-mode-goto-loc (alist-get 'location (button-get b 'symbol))))
          )))
     (switch-to-buffer-other-window buf)))
+
+(defun lsp-mode-goto-cb (res body)
+  (cond ((equal res :error)
+          (lsp-ignore res body))
+         ((equal res :success)
+          (if (alist-get 'uri body)
+              (lsp-mode-goto-loc body)
+              (lsp-mode-select-destination body)))))
 
 (defun lsp-mode-goto ()
   "Go to the definition of the symbol near point"
@@ -196,14 +201,15 @@
   (send-lsp-msg (lsp-goto-def (current-lsp-text-doc-pos)) 'lsp-mode-goto-cb))
 
 (defun lsp-mode-hover-cb (res body)
-  (cond (((equal res :error)
+  (cond ((equal res :error)
           (lsp-ignore res body))
-         ((equal res :success)
-          (let ((message
-                 (if (listp (alist-get 'contents body))
-                     (apply 'concat (alist-get 'contents body))
-                   (alist-get 'contents body))))
-            (display-message-or-buffer message "*LSP-Message*"))))))
+        ((equal res :success)
+          (let* ((body
+                  (if (sequencep (alist-get 'contents body))
+                      (alist-get 'contents body)
+                    (list (alist-get 'contents body))))
+                 (message (mapcar (lambda (m) (if (listp m) (alist-get 'value m) m)) body)))
+            (display-message-or-buffer (apply 'concat message) "*LSP-Hover*")))))
 
 (defun lsp-mode-hover ()
   "Display hover information for the symbol near point"
@@ -211,28 +217,32 @@
   (send-lsp-msg (lsp-hover (current-lsp-text-doc-pos)) 'lsp-mode-hover-cb))
 
 (defun lsp-mode-references-cb (res body)
-  (cond (((equal res :error)
+  (cond ((equal res :error)
           (lsp-ignore res body))
          ((equal res :success)
-          (lsp-mode-select-destination body)))))
+          (lsp-mode-select-destination (if (alist-get 'uri body) (list body) body)))))
 
 (defun lsp-mode-references ()
   "Find references to the symbol near point"
   (interactive)
   (send-lsp-msg (lsp-find-refs (lsp-ref-params (current-lsp-text-doc-pos)
-                                                   (lsp-ref-context json-false)))
-                    'lsp-mode-references-cb))
+                                               (lsp-ref-context json-false)))
+                'lsp-mode-references-cb))
 
 (defun lsp-mode-symbol-cb (res body)
-  (cond (((equal res :error)
+  (cond ((equal res :error)
           (lsp-ignore res body))
          ((equal res :success)
-          (lsp-mode-list-symbols body)))))
+          (lsp-mode-list-symbols body))))
 
 (defun lsp-mode-symbol (query)
   "Search for project-wide symbols matching the query string"
   (interactive "Mquery:")
   (send-lsp-msg (lsp-workspace-symbols (lsp-workspace-symbol-params query)) 'lsp-mode-symbol-cb))
+
+(defun lsp-mode-shutdown ()
+  (interactive)
+  (send-lsp-msg (lsp-shutdown) 'lsp-ignore))
 
 (define-minor-mode lsp-mode
   "Use a Language Server to provide semantic information about your code"
@@ -243,15 +253,12 @@
             (define-key map (kbd "C-c C-l h") 'lsp-mode-hover)
             (define-key map (kbd "C-c C-l r") 'lsp-mode-references)
             (define-key map (kbd "C-c C-l s") 'lsp-mode-symbol)
+            (define-key map (kbd "C-c C-l q") 'lsp-mode-shutdown)
             map)
   (if lsp-mode
       (progn
         (add-hook 'find-file-hook 'lsp-mode-find-file-hook nil t)
-        (add-hook 'foo 'lsp-foo nil t)
-        (add-hook 'foo 'lsp-foo nil t)
         )
-    (remove-hook 'foo 'lsp-foo t)
-    (remove-hook 'foo 'lsp-foo t)
-    (remove-hook 'foo 'lsp-foo t)
+    (remove-hook 'find-file-hook 'lsp-mode-find-file-hook t)
     )
   )
