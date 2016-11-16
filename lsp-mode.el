@@ -1,10 +1,14 @@
+;;; lsp-mode.el --- Support for talking to an LSP server to provide semantic information about programs
+
 ;; Copyright (c) 2016 Sourcegraph Inc
 
-;; This minor mode handles sending requests to a language server and rendering
-;; responses.
+;; Author: Corey Richardson <corey@octayn.net>
+;; Keywords: convenience
+;; Package-Requires: ((projectile "0.14.0"))
+
+;;; Code:
 
 (require 'projectile)
-(require 'lsp)
 (require 'cl-lib)
 (require 'button)
 (require 'json)
