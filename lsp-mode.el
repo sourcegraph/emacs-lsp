@@ -4,7 +4,7 @@
 
 ;; Author: Corey Richardson <corey@octayn.net>
 ;; Keywords: convenience
-;; Package-Requires: ((projectile "0.14.0"))
+;; Package-Requires: ((projectile "0.14.0") (emacs "25.1"))
 
 ;;; Code:
 
