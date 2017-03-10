@@ -19,10 +19,9 @@
   "Add Content-Type and Content-Length headers to an LSP payload"
   (let ((len (length body))
         (type (or content-type "application/vscode-jsonrpc; charset=utf-8")))
-    (apply 'concat (mapcar (lambda (s) (encode-coding-string s 'utf-8))
-                            `("Content-Length: " ,(number-to-string len) "\r\n" "Content-Type: " ,type "\r\n\r\n" ,body)))
-    )
-  )
+    (mapconcat (lambda (s) (encode-coding-string s 'utf-8))
+               `("Content-Length: " ,(number-to-string len) "\r\n" "Content-Type: " ,type "\r\n\r\n" ,body)
+               "")))
 
 (defun lsp-message (msg)
   (lsp-wrap-payload (json-encode msg)))
