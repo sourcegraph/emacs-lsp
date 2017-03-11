@@ -434,6 +434,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   (interactive)
   (lsp-send-msg (lsp-shutdown) 'lsp-ignore))
 
+;;;###autoload
 (define-minor-mode lsp-mode
   "Use a Language Server to provide semantic information about your code."
   :lighter " lsp"
