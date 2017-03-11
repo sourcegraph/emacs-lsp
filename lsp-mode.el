@@ -293,7 +293,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
     (set-process-filter net-proc (lsp-filter session))
     (puthash ws conn lsp-ws-connection-map)
     (lsp-init-conn-inner ws conn)
-    (lsp-send-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
+    ;; (lsp-send-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
     ))
 
 (defun lsp-ws-cache-key ()
