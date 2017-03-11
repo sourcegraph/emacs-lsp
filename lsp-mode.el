@@ -329,9 +329,9 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
 
 (defun lsp-alist-navigate (obj &rest path)
   "Extract a property from an alist, using successive symbols from path."
-  (let ((cur_obj obj))
-    (dolist (cur path cur_obj)
-      (setq cur_obj (alist-get cur cur_obj)))))
+  (let ((cur-obj obj))
+    (dolist (cur path cur-obj)
+      (setq cur-obj (alist-get cur cur-obj)))))
 
 (defun lsp-mode-goto-loc (loc)
   (let ((comps (split-string (alist-get 'uri loc) "://")))
