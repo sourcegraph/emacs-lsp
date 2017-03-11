@@ -6,6 +6,17 @@
 ;; Keywords: convenience
 ;; Package-Requires: ((projectile "0.14.0") (emacs "25.1"))
 
+;;; Commentary:
+
+;; Activating `lsp-mode' in a buffer enables LSP server communication
+;; support.  Use `lsp-mode-init-conn' to initialize a connection to an
+;; LSP server.  Only connections over TCP are supported right now.
+;; Each LSP connection is associated with a `projectile-project-root':
+;; lsp-mode will try to use the connection for the project
+;; corresponding to the current buffer.
+
+;; See `lsp-mode-map' for further commands.
+
 ;;; Code:
 
 (require 'projectile)
