@@ -181,7 +181,7 @@
 
 ;;; LS protocol handling.
 
-(defstruct ls-connection
+(cl-defstruct lsp-connection
   process
   session
   bufname
@@ -234,7 +234,7 @@
                   (search-forward "\r\n{")
                   (let* ((content-body (buffer-substring (- (point) 1) (+ (- (point) 1) content-length)))
                          (content (let ((json-array-type 'list)) (json-read-from-string content-body)))
-                         (sess (ls-connection-session conn))
+                         (sess (lsp-connection-session conn))
                          (id (alist-get 'id content))
                          (cb (gethash id sess)))
                     ;; remove the request from the buffer
@@ -264,7 +264,7 @@
                            (lsp-display-err-and-wait-for-confirmation body)
                            (init-lsp-conn-inner ws conn)))
                         ((equal res :success)
-                         (setf (ls-connection-server-caps conn) (alist-get 'capabilities body)))))))
+                         (setf (lsp-connection-server-caps conn) (alist-get 'capabilities body)))))))
 
 (defun lsp-mode-init-conn (host port)
   "Initialize a new connection to an LSP"
@@ -273,7 +273,7 @@
          (net-proc (open-network-stream "lsp" bufname host port :type 'plain ))
          (session (make-hash-table))
          (ws (projectile-project-root))
-         (conn (make-ls-connection :process net-proc :session session :bufname bufname))
+         (conn (make-lsp-connection :process net-proc :session session :bufname bufname))
          )
     (set-process-filter net-proc (lsp-filter session))
     (puthash ws conn lsp-ws-connection-map)
@@ -286,8 +286,8 @@
 (defun send-lsp-msg (req &optional cb)
   (let ((s (gethash ws-cache lsp-ws-connection-map))
         (nid (abs (random (- (expt 2 64) 1)))))
-    (puthash nid cb (ls-connection-session s))
-    (process-send-string (ls-connection-process s) (lsp-message (cons `(id . ,nid) req)))
+    (puthash nid cb (lsp-connection-session s))
+    (process-send-string (lsp-connection-process s) (lsp-message (cons `(id . ,nid) req)))
     )
   )
 
