@@ -229,7 +229,7 @@
                 (goto-char 17)
                 (looking-at "[0-9]+")
                 (let ((content-length (string-to-int (match-string 0)))
-                      (conn (gethash lsp-ws-cache lsp-ws-connection-map)))
+                      (conn (gethash (lsp-ws-cache-key) lsp-ws-connection-map)))
                   ;; scan point forward to start of body
                   (search-forward "\r\n{")
                   (let* ((content-body (buffer-substring (- (point) 1) (+ (- (point) 1) content-length)))
@@ -281,10 +281,11 @@
     (lsp-send-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
     ))
 
-(defvar-local lsp-ws-cache (projectile-project-root))
+(defun lsp-ws-cache-key ()
+  (projectile-project-root))
 
 (defun lsp-send-msg (req &optional cb)
-  (let ((s (gethash lsp-ws-cache lsp-ws-connection-map))
+  (let ((s (gethash (lsp-ws-cache-key) lsp-ws-connection-map))
         (nid (abs (random (- (expt 2 64) 1)))))
     (puthash nid cb (lsp-connection-session s))
     (process-send-string (lsp-connection-process s) (lsp-message (cons `(id . ,nid) req)))
