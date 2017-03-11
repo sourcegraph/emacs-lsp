@@ -255,14 +255,14 @@
 ;;; recursive call to init-lsp-conn-inner, although it's a bit challenging due
 ;;; to the callback nature.
 
-(defun init-lsp-conn-inner (ws conn)
-  (send-lsp-msg (lsp-init (lsp-init-params nil nil ws nil))
+(defun lsp-init-conn-inner (ws conn)
+  (lsp-send-msg (lsp-init (lsp-init-params nil nil ws nil))
                 (lambda (res body)
                   (cond ((equal res :error)
                          (let* ((err (alist-get 'error body))
                                 (retry (alist-get 'retry err)))
                            (lsp-display-err-and-wait-for-confirmation body)
-                           (init-lsp-conn-inner ws conn)))
+                           (lsp-init-conn-inner ws conn)))
                         ((equal res :success)
                          (setf (lsp-connection-server-caps conn) (alist-get 'capabilities body)))))))
 
@@ -277,13 +277,13 @@
          )
     (set-process-filter net-proc (lsp-filter session))
     (puthash ws conn lsp-ws-connection-map)
-    (init-lsp-conn-inner ws conn)
-    (send-lsp-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
+    (lsp-init-conn-inner ws conn)
+    (lsp-send-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
     ))
 
 (defvar-local lsp-ws-cache (projectile-project-root))
 
-(defun send-lsp-msg (req &optional cb)
+(defun lsp-send-msg (req &optional cb)
   (let ((s (gethash lsp-ws-cache lsp-ws-connection-map))
         (nid (abs (random (- (expt 2 64) 1)))))
     (puthash nid cb (lsp-connection-session s))
@@ -291,27 +291,27 @@
     )
   )
 
-(defun uri-for-path (p)
+(defun lsp-uri-for-path (p)
   (concat "file://" p)) ; FIXME: more robust? does this work on windows?
 
 (defun lsp-buffer-text-doc-id (&optional buffer)
   "Return the text doc ID for BUFFER, or the current buffer if not supplied."
-  (lsp-text-doc-id (uri-for-path (buffer-file-name buffer))))
+  (lsp-text-doc-id (lsp-uri-for-path (buffer-file-name buffer))))
 
 (defun lsp-mode-find-file-hook ()
-  (send-lsp-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore))
+  (lsp-send-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore))
 
 (defun lsp-mode-write-file-functions ()
-  (send-lsp-msg (lsp-did-save-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
+  (lsp-send-msg (lsp-did-save-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
   nil)
 
-(defun current-lsp-pos ()
+(defun lsp-current-lsp-pos ()
   (lsp-position (line-number-at-pos (point)) (current-column)))
 
-(defun current-lsp-text-doc-pos ()
-  (lsp-text-doc-pos-params (lsp-buffer-text-doc-id) (current-lsp-pos)))
+(defun lsp-current-lsp-text-doc-pos ()
+  (lsp-text-doc-pos-params (lsp-buffer-text-doc-id) (lsp-current-lsp-pos)))
 
-(defun alist-navigate (obj &rest path)
+(defun lsp-alist-navigate (obj &rest path)
   "Extract a property from an alist, using successive symbols from path."
   (let ((cur_obj obj))
     (dolist (cur path cur_obj)
@@ -324,8 +324,8 @@
           (switch-to-buffer-other-window newbuf)
           (lsp-mode)
           (beginning-of-buffer)
-          (forward-line (alist-navigate loc 'range 'start 'line))
-          (forward-char (alist-navigate loc 'range 'start 'character)))
+          (forward-line (lsp-alist-navigate loc 'range 'start 'line))
+          (forward-char (lsp-alist-navigate loc 'range 'start 'character)))
       )))
 
 (defun lsp-mode-select-destination (locs)
@@ -335,7 +335,7 @@
       (erase-buffer)
       (dolist (loc locs)
         (insert-button
-         (apply 'concat (list (alist-get 'uri loc) " at line " (int-to-string (alist-navigate loc 'range 'start 'line)) "\n"))
+         (apply 'concat (list (alist-get 'uri loc) " at line " (int-to-string (lsp-alist-navigate loc 'range 'start 'line)) "\n"))
          'location loc
          'follow-link t
          'action (lambda (b) (lsp-mode-goto-loc (button-get b 'location))))))
@@ -353,9 +353,9 @@
                          " "
                          (alist-get 'name sym)
                          " in "
-                         (alist-navigate sym 'location 'uri)
+                         (lsp-alist-navigate sym 'location 'uri)
                          " at line "
-                         (int-to-string (alist-navigate sym 'location 'range 'start 'line))
+                         (int-to-string (lsp-alist-navigate sym 'location 'range 'start 'line))
                          "\n"))
          'symbol sym
          'follow-link t
@@ -374,7 +374,7 @@
 (defun lsp-mode-goto ()
   "Go to the definition of the symbol near point"
   (interactive)
-  (send-lsp-msg (lsp-goto-def (current-lsp-text-doc-pos)) 'lsp-mode-goto-cb))
+  (lsp-send-msg (lsp-goto-def (lsp-current-lsp-text-doc-pos)) 'lsp-mode-goto-cb))
 
 (defun lsp-mode-hover-cb (res body)
   (cond ((equal res :error)
@@ -390,7 +390,7 @@
 (defun lsp-mode-hover ()
   "Display hover information for the symbol near point"
   (interactive)
-  (send-lsp-msg (lsp-hover (current-lsp-text-doc-pos)) 'lsp-mode-hover-cb))
+  (lsp-send-msg (lsp-hover (lsp-current-lsp-text-doc-pos)) 'lsp-mode-hover-cb))
 
 (defun lsp-mode-references-cb (res body)
   (cond ((equal res :error)
@@ -401,7 +401,7 @@
 (defun lsp-mode-references ()
   "Find references to the symbol near point"
   (interactive)
-  (send-lsp-msg (lsp-find-refs (lsp-ref-params (current-lsp-text-doc-pos)
+  (lsp-send-msg (lsp-find-refs (lsp-ref-params (lsp-current-lsp-text-doc-pos)
                                                (lsp-ref-context json-false)))
                 'lsp-mode-references-cb))
 
@@ -414,11 +414,11 @@
 (defun lsp-mode-symbol (query)
   "Search for project-wide symbols matching the query string"
   (interactive "Mquery:")
-  (send-lsp-msg (lsp-workspace-symbols (lsp-workspace-symbol-params query)) 'lsp-mode-symbol-cb))
+  (lsp-send-msg (lsp-workspace-symbols (lsp-workspace-symbol-params query)) 'lsp-mode-symbol-cb))
 
 (defun lsp-mode-shutdown ()
   (interactive)
-  (send-lsp-msg (lsp-shutdown) 'lsp-ignore))
+  (lsp-send-msg (lsp-shutdown) 'lsp-ignore))
 
 (define-minor-mode lsp-mode
   "Use a Language Server to provide semantic information about your code"
