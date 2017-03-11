@@ -272,13 +272,14 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
 (defun lsp-init-conn-inner (ws conn)
   (lsp-send-msg (lsp-init (lsp-init-params nil nil ws nil))
                 (lambda (res body)
-                  (cond ((equal res :error)
-                         (let* ((err (alist-get 'error body))
-                                (retry (alist-get 'retry err)))
-                           (lsp-display-err-and-wait-for-confirmation body)
-                           (lsp-init-conn-inner ws conn)))
-                        ((equal res :success)
-                         (setf (lsp-connection-server-caps conn) (alist-get 'capabilities body)))))))
+                  (pcase res
+                    (:error
+                     (let* ((err (alist-get 'error body))
+                            (retry (alist-get 'retry err)))
+                       (lsp-display-err-and-wait-for-confirmation body)
+                       (lsp-init-conn-inner ws conn)))
+                    (:success
+                     (setf (lsp-connection-server-caps conn) (alist-get 'capabilities body)))))))
 
 (defun lsp-mode-init-conn (host port)
   "Initialize a new connection to an LSP"
@@ -379,12 +380,11 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
     (switch-to-buffer-other-window buf)))
 
 (defun lsp-mode-goto-cb (res body)
-  (cond ((equal res :error)
-          (lsp-ignore res body))
-         ((equal res :success)
-          (if (alist-get 'uri body)
-              (lsp-mode-goto-loc body)
-              (lsp-mode-select-destination body)))))
+  (pcase res
+    (:error (lsp-ignore res body))
+    (:success (if (alist-get 'uri body)
+                  (lsp-mode-goto-loc body)
+                (lsp-mode-select-destination body)))))
 
 (defun lsp-mode-goto ()
   "Go to the definition of the symbol near point"
@@ -392,15 +392,15 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   (lsp-send-msg (lsp-goto-def (lsp-current-lsp-text-doc-pos)) 'lsp-mode-goto-cb))
 
 (defun lsp-mode-hover-cb (res body)
-  (cond ((equal res :error)
-          (lsp-ignore res body))
-        ((equal res :success)
-          (let* ((body
-                  (if (sequencep (alist-get 'contents body))
-                      (alist-get 'contents body)
-                    (list (alist-get 'contents body))))
-                 (message (mapcar (lambda (m) (if (listp m) (alist-get 'value m) m)) body)))
-            (display-message-or-buffer (apply 'concat message) "*LSP-Hover*")))))
+  (pcase res
+    (:error (lsp-ignore res body))
+    (:success
+     (let* ((body
+             (if (sequencep (alist-get 'contents body))
+                 (alist-get 'contents body)
+               (list (alist-get 'contents body))))
+            (message (mapcar (lambda (m) (if (listp m) (alist-get 'value m) m)) body)))
+       (display-message-or-buffer (apply 'concat message) "*LSP-Hover*")))))
 
 (defun lsp-mode-hover ()
   "Display hover information for the symbol near point"
@@ -408,10 +408,9 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   (lsp-send-msg (lsp-hover (lsp-current-lsp-text-doc-pos)) 'lsp-mode-hover-cb))
 
 (defun lsp-mode-references-cb (res body)
-  (cond ((equal res :error)
-          (lsp-ignore res body))
-         ((equal res :success)
-          (lsp-mode-select-destination (if (alist-get 'uri body) (list body) body)))))
+  (pcase res
+    (:error (lsp-ignore res body))
+    (:success (lsp-mode-select-destination (if (alist-get 'uri body) (list body) body)))))
 
 (defun lsp-mode-references ()
   "Find references to the symbol near point"
@@ -421,10 +420,9 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
                 'lsp-mode-references-cb))
 
 (defun lsp-mode-symbol-cb (res body)
-  (cond ((equal res :error)
-          (lsp-ignore res body))
-         ((equal res :success)
-          (lsp-mode-list-symbols body))))
+  (pcase res
+    (:error (lsp-ignore res body))
+    (:success (lsp-mode-list-symbols body))))
 
 (defun lsp-mode-symbol (query)
   "Search for project-wide symbols matching the query string"
