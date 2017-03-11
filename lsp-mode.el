@@ -322,7 +322,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   nil)
 
 (defun lsp-current-lsp-pos ()
-  (lsp-position (line-number-at-pos (point)) (current-column)))
+  (lsp-position (1- (line-number-at-pos (point))) (current-column)))
 
 (defun lsp-current-lsp-text-doc-pos ()
   (lsp-text-doc-pos-params (lsp-buffer-text-doc-id) (lsp-current-lsp-pos)))
