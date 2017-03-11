@@ -292,8 +292,7 @@
   )
 
 (defun uri-for-path (p)
-  (apply 'concat (list "file://" p)) ; FIXME: more robust? does this work on windows?
-  )
+  (concat "file://" p)) ; FIXME: more robust? does this work on windows?
 
 (defun lsp-mode-find-file-hook ()
   (send-lsp-msg (lsp-did-open-text-doc (lsp-text-doc-id (uri-for-path (buffer-file-name)))) 'lsp-ignore))
