@@ -1,4 +1,4 @@
-;;; lsp-mode.el --- Support for talking to an LSP server to provide semantic information about programs
+;;; lsp-mode.el --- Use a Language Server to provide semantic information about your code
 
 ;; Copyright (c) 2016 Sourcegraph Inc
 
