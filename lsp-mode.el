@@ -455,3 +455,4 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   )
 
 (provide 'lsp-mode)
+;;; lsp-mode.el ends here
