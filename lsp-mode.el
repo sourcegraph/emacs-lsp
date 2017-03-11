@@ -27,12 +27,15 @@
 ;;; LSP datatype construction
 
 (defun lsp-wrap-payload (body &optional content-type)
-  "Add Content-Type and Content-Length headers to an LSP payload"
-  (let ((len (length body))
-        (type (or content-type "application/vscode-jsonrpc; charset=utf-8")))
-    (mapconcat (lambda (s) (encode-coding-string s 'utf-8))
-               `("Content-Length: " ,(number-to-string len) "\r\n" "Content-Type: " ,type "\r\n\r\n" ,body)
-               "")))
+  "Add Content-Type and Content-Length headers to an LSP payload.
+BODY is the payload, and CONTENT-TYPE is a non-default content type."
+  (let ((encoded-body (if content-type
+                          body
+                        (encode-coding-string body 'utf-8))))
+    (format "Content-Length: %d\r\nContent-Type: %s\r\n\r\n%s"
+            (length encoded-body)
+            (or content-type "application/vscode-jsonrpc; charset=utf-8")
+            encoded-body)))
 
 (defun lsp-message (msg)
   (lsp-wrap-payload (json-encode msg)))
