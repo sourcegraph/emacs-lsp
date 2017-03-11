@@ -278,7 +278,7 @@
     (set-process-filter net-proc (lsp-filter session))
     (puthash ws conn lsp-ws-connection-map)
     (init-lsp-conn-inner ws conn)
-    (send-lsp-msg (lsp-did-open-text-doc (lsp-text-doc-id (uri-for-path (buffer-file-name)))) 'lsp-ignore)
+    (send-lsp-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
     ))
 
 (defvar-local lsp-ws-cache (projectile-project-root))
@@ -294,18 +294,22 @@
 (defun uri-for-path (p)
   (concat "file://" p)) ; FIXME: more robust? does this work on windows?
 
+(defun lsp-buffer-text-doc-id (&optional buffer)
+  "Return the text doc ID for BUFFER, or the current buffer if not supplied."
+  (lsp-text-doc-id (uri-for-path (buffer-file-name buffer))))
+
 (defun lsp-mode-find-file-hook ()
-  (send-lsp-msg (lsp-did-open-text-doc (lsp-text-doc-id (uri-for-path (buffer-file-name)))) 'lsp-ignore))
+  (send-lsp-msg (lsp-did-open-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore))
 
 (defun lsp-mode-write-file-functions ()
-  (send-lsp-msg (lsp-did-save-text-doc (lsp-text-doc-id (uri-for-path (buffer-file-name)))) 'lsp-ignore)
+  (send-lsp-msg (lsp-did-save-text-doc (lsp-buffer-text-doc-id)) 'lsp-ignore)
   nil)
 
 (defun current-lsp-pos ()
   (lsp-position (line-number-at-pos (point)) (current-column)))
 
 (defun current-lsp-text-doc-pos ()
-  (lsp-text-doc-pos-params (lsp-text-doc-id (uri-for-path (buffer-file-name))) (current-lsp-pos)))
+  (lsp-text-doc-pos-params (lsp-buffer-text-doc-id) (current-lsp-pos)))
 
 (defun alist-navigate (obj &rest path)
   "Extract a property from an alist, using successive symbols from path."
