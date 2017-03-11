@@ -282,7 +282,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
                      (setf (lsp-connection-server-caps conn) (alist-get 'capabilities body)))))))
 
 (defun lsp-mode-init-conn (host port)
-  "Initialize a new connection to an LSP"
+  "Initialize a new connection to an LSP on HOST and PORT."
   (interactive "Mhostname:\nnport:")
   (let* ((bufname (concat "*lsp*" (int-to-string (random))))
          (net-proc (open-network-stream "lsp" bufname host port :type 'plain ))
@@ -328,7 +328,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
   (lsp-text-doc-pos-params (lsp-buffer-text-doc-id) (lsp-current-lsp-pos)))
 
 (defun lsp-alist-navigate (obj &rest path)
-  "Extract a property from an alist, using successive symbols from path."
+  "Extract a property from an alist OBJ, using successive symbols from PATH."
   (let ((cur-obj obj))
     (dolist (cur path cur-obj)
       (setq cur-obj (alist-get cur cur-obj)))))
@@ -345,7 +345,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
       )))
 
 (defun lsp-mode-select-destination (locs)
-  "Given a list of locations, display them in a new window with hyperlinks"
+  "Given a list of locations LOCS, display them in a new window with hyperlinks."
   (let ((buf (get-buffer-create "*LSP-Select-Destination*")))
     (with-current-buffer buf
       (erase-buffer)
@@ -358,7 +358,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
     (switch-to-buffer-other-window buf)))
 
 (defun lsp-mode-list-symbols (syms)
-  "Given a list of symbols, display them in a new window with hyperlinks"
+  "Given a list of symbols SYMS, display them in a new window with hyperlinks."
   (let ((buf (get-buffer-create "*LSP-List-Symbols*")))
     (with-current-buffer buf
       (erase-buffer)
@@ -387,7 +387,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
                 (lsp-mode-select-destination body)))))
 
 (defun lsp-mode-goto ()
-  "Go to the definition of the symbol near point"
+  "Go to the definition of the symbol near point."
   (interactive)
   (lsp-send-msg (lsp-goto-def (lsp-current-lsp-text-doc-pos)) 'lsp-mode-goto-cb))
 
@@ -403,7 +403,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
        (display-message-or-buffer (apply 'concat message) "*LSP-Hover*")))))
 
 (defun lsp-mode-hover ()
-  "Display hover information for the symbol near point"
+  "Display hover information for the symbol near point."
   (interactive)
   (lsp-send-msg (lsp-hover (lsp-current-lsp-text-doc-pos)) 'lsp-mode-hover-cb))
 
@@ -413,7 +413,7 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
     (:success (lsp-mode-select-destination (if (alist-get 'uri body) (list body) body)))))
 
 (defun lsp-mode-references ()
-  "Find references to the symbol near point"
+  "Find references to the symbol near point."
   (interactive)
   (lsp-send-msg (lsp-find-refs (lsp-ref-params (lsp-current-lsp-text-doc-pos)
                                                (lsp-ref-context json-false)))
@@ -425,16 +425,17 @@ BODY is the payload, and CONTENT-TYPE is a non-default content type."
     (:success (lsp-mode-list-symbols body))))
 
 (defun lsp-mode-symbol (query)
-  "Search for project-wide symbols matching the query string"
+  "Search for project-wide symbols matching the QUERY string."
   (interactive "Mquery:")
   (lsp-send-msg (lsp-workspace-symbols (lsp-workspace-symbol-params query)) 'lsp-mode-symbol-cb))
 
 (defun lsp-mode-shutdown ()
+  "Tell the language server to shut down."
   (interactive)
   (lsp-send-msg (lsp-shutdown) 'lsp-ignore))
 
 (define-minor-mode lsp-mode
-  "Use a Language Server to provide semantic information about your code"
+  "Use a Language Server to provide semantic information about your code."
   :lighter " lsp"
   :keymap (let ((map (make-sparse-keymap)))
             (define-key map (kbd "C-c C-l i") 'lsp-mode-init-conn)
